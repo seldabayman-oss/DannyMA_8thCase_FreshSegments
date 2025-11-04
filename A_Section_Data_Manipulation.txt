@@ -1,0 +1,99 @@
+Data Exploration and Cleansing
+
+1- Update the fresh_segments.interest_metrics table by modifying the month_year column to be a date data type with the start of the month
+2-What is count of records in the fresh_segments.interest_metrics for each month_year value sorted in chronological order (earliest to latest) with the null values appearing first?
+3-What do you think we should do with these null values in the fresh_segments.interest_metrics
+4-How many interest_id values exist in the fresh_segments.interest_metrics table but not in the fresh_segments.interest_map table? What about the other way around?
+5-Summarise the id values in the fresh_segments.interest_map by its total record count in this table
+6-What sort of table join should we perform for our analysis and why? Check your logic by checking the rows where interest_id = 21246 in your joined output and include all columns from fresh_segments.interest_metrics and all columns from fresh_segments.interest_map except from the id column.
+7-Are there any records in your joined table where the month_year value is before the created_at value from the fresh_segments.interest_map table? Do you think these values are valid and why?
+
+1. Modify month_year Column to Date Type
+Task: Update the month_year column in fresh_segments.interest_metrics to have a DATE data type with the start of the month.
+
+-- Update the column to be a date with the start of the month
+
+UPDATE interest_metrics
+SET month_year = DATE_TRUNC('month', TO_DATE (month_year, 'YYYY-MM'));
+
+2. Count Records for Each month_year Value
+Task: Count the records in fresh_segments.interest_metrics for each month_year, sorted in chronological order with null values appearing first.
+
+-- Count records for each month_year including null values
+SELECT 
+    month_year, 
+    COUNT(*) AS record
+FROM interest_metrics
+GROUP BY month_year
+ORDER BY month_year IS NULL, month_year;
+
+Analysis:
+Null values appear first in the result set due to month_year IS NULL in the ORDER BY clause.
+Consider imputing nulls with a default value (e.g., earliest or latest date) or excluding them based on business logic.
+
+3. Handling Null Values in month_year
+Question: What should we do with the null values?
+
+Answer:
+If the null values represent incomplete or erroneous data, we can:
+Impute the missing dates with a placeholder like '1900-01-01'.
+Remove the rows with null values if they are not critical for analysis.
+If nulls are valid but cannot be replaced, flag them for review in future data quality audits.
+
+4. Count interest_id Values Missing Between Tables
+Task: Identify interest_id values in interest_metrics but not in interest_map and vice versa.
+
+-- interest_id in interest_metrics but not in interest_map
+SELECT 
+    COUNT(DISTINCT im.interest_id) AS metrics_not
+FROM interest_metrics im
+LEFT JOIN interest_map imp ON im.interest_id = map.id
+WHERE map.id IS NULL;
+
+-- interest_id in interest_map but not in interest_metrics
+SELECT 
+    COUNT(DISTINCT map.id) AS map_not
+FROM interest_map map
+LEFT JOIN interest_metrics im ON map.id = im.interest_id
+WHERE im.interest_id IS NULL;
+
+5. Summarize Total Records in interest_map by id
+Task: Summarize the total record count in the interest_map table by id.
+
+SELECT 
+    id, 
+    COUNT(*) AS total
+FROM interest_map
+GROUP BY id
+ORDER BY total DESC;
+
+6. Type of Join and Validation
+Task: Perform a table join for analysis and validate with interest_id = 21246.
+Join Type: Use a LEFT JOIN to retain all rows from interest_metrics and bring in corresponding records from interest_map. This ensures we don’t lose data from interest_metrics if there is no match in interest_map.
+
+-- Perform the join
+SELECT 
+    im.*, 
+    map.created_at, 
+    map.interest_name
+FROM interest_metrics im
+LEFT JOIN interest_map map ON im.interest_id = map.id
+WHERE im.interest_id = 21246;
+
+Analysis:
+Check the resulting columns for interest_id = 21246 to ensure data alignment and accuracy.
+Ensure no critical information is missing in the joined output.
+
+7. Validate month_year vs created_at
+Task: Check if any month_year values are before created_at in the joined table.
+
+-- Identify records where month_year is before created_at
+SELECT 
+    im.*, 
+    map.created_at
+FROM interest_metrics im
+LEFT JOIN interest_map map ON im.interest_id = map.id
+WHERE im.month_year < map.created_at;
+
+Analysis:
+If month_year < created_at, the data may be invalid as the date logic implies an inconsistency.
